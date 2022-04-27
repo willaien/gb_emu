@@ -408,7 +408,8 @@ namespace gb_emu
                     CPURegisters.ResetH();
                     CPURegisters.ResetN();
                     break;
-                
+                case 0x76: // halt
+                    break;
                 case 0x80: // add a, b
                     add(CPURegisters.A, CPURegisters.B);
                     break;
@@ -850,54 +851,7 @@ namespace gb_emu
                         }
                         break;
                     }
-                //
-                //     var add = (sbyte)readNextByte();
-                //     var seth = false;
-                //     var setc = false;
-                //     if (add < 0) //subtract
-                //     {
 
-                //         if (isHalfCarrySub((byte)(CPURegisters.SP & 0xFF), (byte) -add, false))
-                //         {
-                //             seth = true;
-                //         }
-                //         if (CPURegisters.SP + add < 0)
-                //         {
-                //             setc = false;
-                //             seth = false;
-                //         }
-                //         if (CPURegisters.SP + add == 0)
-                //         {
-                //             setc = true;
-                //             seth = true;
-                //         }
-                //         if (CPURegisters.SP >= 0xF && CPURegisters.SP + add < 0xF)
-                //         {
-                //             setc = true;
-                //             seth = true;
-                //         }
-                //     }
-                //     else // add
-                //     {
-                //         if (isHalfCarryAdd((byte)(CPURegisters.SP & 0xFF), (byte)add, false))
-                //         {
-                //             seth = true;
-                //         }
-                //         if ((CPURegisters.SP & 0xFF) + (byte)add > 0xFF)
-                //         {
-                //             seth = true;
-                //             setc = true;
-                //         }
-
-                //     }
-                //     CPURegisters.SetOrResetC(setc);
-                //     CPURegisters.SetOrResetH(seth);
-                //     CPURegisters.SP = (ushort)(CPURegisters.SP + add);
-                //     CPURegisters.ResetZ();
-                //     CPURegisters.ResetN();
-
-                //     break;
-                // }
                 case 0xE9: // jp hl
                     CPURegisters.PC = CPURegisters.HL;
                     break;
@@ -1000,7 +954,11 @@ namespace gb_emu
                 case 0xFF: // rst 38h
                     rst(0x38);
                     break;
-
+                default:
+                    if (currentOpCode > 0x40 & currentOpCode <0x7F){
+                        LDFunctions[currentOpCode]();
+                    }
+                    break;
             }
         }
         private ushort read_ushort()

@@ -7,15 +7,41 @@ namespace gb_emu
     {
         public CPU()
         {
-            CBActions = populateCBTable();
             Memory = new MMU(_ => CycleDelay++);
+            functions = new ReadWriteFunction[] {
+                    new (() => CPURegisters.B, (x) => CPURegisters.B = x),
+                    new (() => CPURegisters.C, (x) => CPURegisters.C = x),
+                    new (() => CPURegisters.D, (x) => CPURegisters.D = x),
+                    new (() => CPURegisters.E, (x) => CPURegisters.E = x),
+                    new (() => CPURegisters.H, (x) => CPURegisters.H = x),
+                    new (() => CPURegisters.L, (x) => CPURegisters.L = x),
+                    new (() => Memory[CPURegisters.HL], (x) => Memory[CPURegisters.HL] = x),
+                    new (() => CPURegisters.A, (x) => CPURegisters.A = x)
+            };
+            CBActions = populateCBTable();
+            LDFunctions = populateLDTable();
         }
+
+        private Action[] populateLDTable()
+        {
+            var actions = new Action[256];
+            for (int i = 0x40; i < 0x7F; i++)
+            {
+                var target = functions[(i >> 3) & 0x7];
+                var source = functions[i & 0x7];
+                actions[i] = () => target.setter(source.getter());
+            }
+            return actions;
+        }
+
+        ReadWriteFunction[] functions;
         public MMU Memory;
         public long Cycles = 0;
         public int CycleDelay = 0;
         public bool InterruptEnabled = true;
         public Registers CPURegisters = new Registers();
         private Action[] CBActions;
+        private Action[] LDFunctions;
         private HashSet<byte> _opcodes = new HashSet<byte>();
         public void NextCycle() // this method will need some cleanup, it's a fairly naive and unstructured implementation.
         {
@@ -27,6 +53,11 @@ namespace gb_emu
             }
             //Console.WriteLine("A: {0:X2} F: {1:X2} B: {2:X2} C: {3:X2} D: {4:X2} E: {5:X2} H: {6:X2} L: {7:X2} SP: {8:X4} PC: 00:{9:X4} ({10:X2} {11:X2} {12:X2} {13:X2})", CPURegisters.A, CPURegisters.F, CPURegisters.B, CPURegisters.C, CPURegisters.D, CPURegisters.E, CPURegisters.H, CPURegisters.L, CPURegisters.SP, CPURegisters.PC, Memory[CPURegisters.PC], Memory[CPURegisters.PC+1], Memory[CPURegisters.PC+2], Memory[CPURegisters.PC+3]);
             var currentOpCode = readNextByte();
+            if (LDFunctions[currentOpCode] != null && currentOpCode != 0x76 /* HALT */) 
+            {
+                LDFunctions[currentOpCode]();
+                return;
+            }
             switch (currentOpCode)
             {
                 case 0x00: // nop
@@ -377,195 +408,7 @@ namespace gb_emu
                     CPURegisters.ResetH();
                     CPURegisters.ResetN();
                     break;
-                case 0x40: // ld b, b; this is just a NOP
-                    break;
-                case 0x41: // ld b, c
-                    CPURegisters.B = CPURegisters.C;
-                    break;
-                case 0x42: // ld b, d
-                    CPURegisters.B = CPURegisters.D;
-                    break;
-                case 0x43: // ld b, e
-                    CPURegisters.B = CPURegisters.E;
-                    break;
-                case 0x44: // ld b, h
-                    CPURegisters.B = CPURegisters.H;
-                    break;
-                case 0x45: // ld b, l
-                    CPURegisters.B = CPURegisters.L;
-                    break;
-                case 0x46: // ld b, (hl)
-                    CPURegisters.B = Memory[CPURegisters.HL];
-                    break;
-                case 0x47: // ld b, a
-                    CPURegisters.B = CPURegisters.A;
-                    break;
-                case 0x48: // ld c, b
-                    CPURegisters.C = CPURegisters.B;
-                    break;
-                case 0x49: // ld c, c
-                    break;
-                case 0x4A: // ld c, d
-                    CPURegisters.C = CPURegisters.D;
-                    break;
-                case 0x4B: // ld c, e
-                    CPURegisters.C = CPURegisters.E;
-                    break;
-                case 0x4C: // ld c, h
-                    CPURegisters.C = CPURegisters.H;
-                    break;
-                case 0x4D: // ld c, l
-                    CPURegisters.C = CPURegisters.L;
-                    break;
-                case 0x4E: // ld c, (hl)
-                    CPURegisters.C = Memory[CPURegisters.HL];
-                    break;
-                case 0x4F: // ld c, a
-                    CPURegisters.C = CPURegisters.A;
-                    break;
-                case 0x50: // ld d, b
-                    CPURegisters.D = CPURegisters.B;
-                    break;
-                case 0x51: // ld d, c
-                    CPURegisters.D = CPURegisters.C;
-                    break;
-                case 0x52: // ld d, d
-                    CPURegisters.D = CPURegisters.D;
-                    break;
-                case 0x53: // ld d, e
-                    CPURegisters.D = CPURegisters.E;
-                    break;
-                case 0x54: // ld d, h
-                    CPURegisters.D = CPURegisters.H;
-                    break;
-                case 0x55: // ld d, l
-                    CPURegisters.D = CPURegisters.L;
-                    break;
-                case 0x56: // ld d, (hl)
-                    CPURegisters.D = Memory[CPURegisters.HL];
-                    break;
-                case 0x57: // ld d, a
-                    CPURegisters.D = CPURegisters.A;
-                    break;
-                case 0x58: // ld e, b
-                    CPURegisters.E = CPURegisters.B;
-                    break;
-                case 0x59: // ld e, c
-                    CPURegisters.E = CPURegisters.C;
-                    break;
-                case 0x5A: // ld e, d
-                    CPURegisters.E = CPURegisters.D;
-                    break;
-                case 0x5B: // ld e, e
-                    CPURegisters.E = CPURegisters.E;
-                    break;
-                case 0x5C: // ld e, h
-                    CPURegisters.E = CPURegisters.H;
-                    break;
-                case 0x5D: // ld e, l
-                    CPURegisters.E = CPURegisters.L;
-                    break;
-                case 0x5E: // ld e, (hl)
-                    CPURegisters.E = Memory[CPURegisters.HL];
-                    break;
-                case 0x5F: // ld e, a
-                    CPURegisters.E = CPURegisters.A;
-                    break;
-                case 0x60: // ld h, b
-                    CPURegisters.H = CPURegisters.B;
-                    break;
-                case 0x61: // ld h, c
-                    CPURegisters.H = CPURegisters.C;
-                    break;
-                case 0x62: // ld h, d
-                    CPURegisters.H = CPURegisters.D;
-                    break;
-                case 0x63: // ld h, e
-                    CPURegisters.H = CPURegisters.E;
-                    break;
-                case 0x64: // ld h, h
-                    CPURegisters.H = CPURegisters.H;
-                    break;
-                case 0x65: // ld h, l
-                    CPURegisters.H = CPURegisters.L;
-                    break;
-                case 0x66: // ld h, (hl)
-                    CPURegisters.H = Memory[CPURegisters.HL];
-                    break;
-                case 0x67: // ld h, h
-                    CPURegisters.H = CPURegisters.A;
-                    break;
-                case 0x68: // ld l, b
-                    CPURegisters.L = CPURegisters.B;
-                    break;
-                case 0x69: // ld l, c
-                    CPURegisters.L = CPURegisters.C;
-                    break;
-                case 0x6A: // ld l, d
-                    CPURegisters.L = CPURegisters.D;
-                    break;
-                case 0x6B: // ld l, e
-                    CPURegisters.L = CPURegisters.E;
-                    break;
-                case 0x6C: // ld l, h
-                    CPURegisters.L = CPURegisters.H;
-                    break;
-                case 0x6D: // ld l, l
-                    CPURegisters.L = CPURegisters.L;
-                    break;
-                case 0x6E: // ld l, (hl)
-                    CPURegisters.L = Memory[CPURegisters.HL];
-                    break;
-                case 0x6F: // ld l, a
-                    CPURegisters.L = CPURegisters.A;
-                    break;
-                case 0x70: // ld (hl), b
-                    Memory[CPURegisters.HL] = CPURegisters.B;
-                    break;
-                case 0x71: // ld (hl), c
-                    Memory[CPURegisters.HL] = CPURegisters.C;
-                    break;
-                case 0x72: // ld (hl), d
-                    Memory[CPURegisters.HL] = CPURegisters.D;
-                    break;
-                case 0x73: // ld (hl), e
-                    Memory[CPURegisters.HL] = CPURegisters.E;
-                    break;
-                case 0x74: // ld (hl), h
-                    Memory[CPURegisters.HL] = CPURegisters.H;
-                    break;
-                case 0x75: // ld (hl), l
-                    Memory[CPURegisters.HL] = CPURegisters.L;
-                    break;
-                case 0x76: // would be ld (hl), (hl); however, this is the HALT instruction. TODO: implement
-                    break;
-                case 0x77: // ld (hl), a
-                    Memory[CPURegisters.HL] = CPURegisters.A;
-                    break;
-                case 0x78: // ld a, b
-                    CPURegisters.A = CPURegisters.B;
-                    break;
-                case 0x79: // ld a, c
-                    CPURegisters.A = CPURegisters.C;
-                    break;
-                case 0x7A: // ld a, d
-                    CPURegisters.A = CPURegisters.D;
-                    break;
-                case 0x7B: // ld a, e
-                    CPURegisters.A = CPURegisters.E;
-                    break;
-                case 0x7C: // ld a, h
-                    CPURegisters.A = CPURegisters.H;
-                    break;
-                case 0x7D: // ld a, l
-                    CPURegisters.A = CPURegisters.L;
-                    break;
-                case 0x7E: // ld a, (hl)
-                    CPURegisters.A = Memory[CPURegisters.HL];
-                    break;
-                case 0x7F: // ld a, a
-                    CPURegisters.A = CPURegisters.A;
-                    break;
+                
                 case 0x80: // add a, b
                     add(CPURegisters.A, CPURegisters.B);
                     break;
@@ -1406,16 +1249,6 @@ namespace gb_emu
         private Action[] populateCBTable()
         {
             var actions = new Action[0x100];
-            var functions = new[] {
-                    new {getter = (Func<byte>)(() => CPURegisters.B), setter = (Action<byte>)((x) => CPURegisters.B = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.C), setter = (Action<byte>)((x) => CPURegisters.C = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.D), setter = (Action<byte>)((x) => CPURegisters.D = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.E), setter = (Action<byte>)((x) => CPURegisters.E = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.H), setter = (Action<byte>)((x) => CPURegisters.H = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.L), setter = (Action<byte>)((x) => CPURegisters.L = x)},
-                    new {getter = (Func<byte>)(() => Memory[CPURegisters.HL]), setter = (Action<byte>)((x) => Memory[CPURegisters.HL] = x)},
-                    new {getter = (Func<byte>)(() => CPURegisters.A), setter = (Action<byte>)((x) => CPURegisters.A = x)}
-            };
             for (int i = 0; i <= 0x7; i++) // rlc
             {
                 var register = functions[i % 8];
@@ -1628,5 +1461,6 @@ namespace gb_emu
             }
             return actions;
         }
+        public record ReadWriteFunction(Func<byte> getter, Action<byte> setter);
     }
 }
